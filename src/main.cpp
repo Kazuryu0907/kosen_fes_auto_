@@ -86,11 +86,43 @@ PIDController pidObYaw(0.01, 0.005, 0);
 Serial serial(USBTX, USBRX);
 
 float TargetXY[][2] = {0,100.0f};
+int currentPoint = 0; 
+
+enum {
+  UP,
+  LEFT
+  }MovingStatus;
+  
+
+void update(float *currentXLocation,float *currentYLocation){
+  IMU.update();
+  double xTemp = odometryXAxis.getDistance();
+  odometryXAxis.setDistance(0);
+  double yTemp = odometryYAxis.getDistance();
+  odometryYAxis.setDistance(0);
+
+  *currentXLocation += xTemp * cos(ToRadian(IMU.getYaw()));
+  *currentYLocation += xTemp * sin(ToRadian(IMU.getYaw()));
+  *currentXLocation -= yTemp * sin(ToRadian(IMU.getYaw()));
+  *currentYLocation += yTemp * cos(ToRadian(IMU.getYaw()));
+
+  serial.printf("%f%s%f\n",*currentYLocation,":",*currentYLocation);
+
+  pidObX.update(TargetXY[currentPoint][0],*currentXLocation);
+  pidObY.update(TargetXY[currentPoint][1],*currentYLocation);
+
+  double pidX = pidObX.getTerm();
+  double pidY = pidObY.getTerm();
+  double pidYaw = pidObYaw.getTerm();
+
+  wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
+  wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
+}
+
 
 int main(){
-
     float currentXLocation,currentYLocation;
-    int currentPoint = 0; 
+
     pidObX.setOutputLimit(0.30f);
     pidObY.setOutputLimit(0.30f);
     pidObX.setOutputLimit(0.30f);
@@ -99,35 +131,8 @@ int main(){
     serial.printf("%s\n","END");
     for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
     while(1){
-      IMU.update();
-
-      double xTemp = odometryXAxis.getDistance();
-      odometryXAxis.setDistance(0);
-      double yTemp = odometryYAxis.getDistance();
-      odometryYAxis.setDistance(0);
-
-    currentXLocation += xTemp * cos(ToRadian(IMU.getYaw()));
-    currentYLocation += xTemp * sin(ToRadian(IMU.getYaw()));
-    currentXLocation -= yTemp * sin(ToRadian(IMU.getYaw()));
-    currentYLocation += yTemp * cos(ToRadian(IMU.getYaw()));
-    serial.printf("%f\n",currentYLocation);
-    pidObX.update(TargetXY[currentPoint][0],currentXLocation);
-    pidObY.update(TargetXY[currentPoint][1],currentYLocation);
-
-    double pidX = pidObX.getTerm();
-    double pidY = pidObY.getTerm();
-    double pidYaw = pidObYaw.getTerm();
-
-    wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
-
-    for(int i = 0;i<4;i++){
-      if(driverPWMOutput[i] > 0){
-        WheelPins[i*2] = driverPWMOutput[i];
-        WheelPins[i*2+1] = 0;
-      }else{
-        WheelPins[i*2] = 0;
-        WheelPins[i*2+1] = driverPWMOutput[i];
-      }
-    }
+      update(&currentXLocation,&currentYLocation);
   } 
+
 }
+

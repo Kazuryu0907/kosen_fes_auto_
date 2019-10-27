@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "c:/Users/ROBOT/Desktop/mbed/kosen_fes_auto/.pio/build/nucleo_f767zi/firmware.elf",
-            "toolchainBinDir": "C:/Users/ROBOT/.platformio/packages/toolchain-gccarmnoneeabi/bin",
-            "svdPath": "C:/Users/ROBOT/.platformio/platforms/ststm32/misc/svd/STM32F7x7.svd",
+            "executable": "e:/github/kosen_fes_auto_/.pio/build/nucleo_f767zi/firmware.elf",
+            "toolchainBinDir": "C:/Users/kazum/.platformio/packages/toolchain-gccarmnoneeabi/bin",
+            "svdPath": "C:/Users/kazum/.platformio/platforms/ststm32/misc/svd/STM32F7x7.svd",
             "preLaunchTask": {
                 "type": "PlatformIO",
                 "task": "Pre-Debug"
@@ -25,9 +25,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "c:/Users/ROBOT/Desktop/mbed/kosen_fes_auto/.pio/build/nucleo_f767zi/firmware.elf",
-            "toolchainBinDir": "C:/Users/ROBOT/.platformio/packages/toolchain-gccarmnoneeabi/bin",
-            "svdPath": "C:/Users/ROBOT/.platformio/platforms/ststm32/misc/svd/STM32F7x7.svd",
+            "executable": "e:/github/kosen_fes_auto_/.pio/build/nucleo_f767zi/firmware.elf",
+            "toolchainBinDir": "C:/Users/kazum/.platformio/packages/toolchain-gccarmnoneeabi/bin",
+            "svdPath": "C:/Users/kazum/.platformio/platforms/ststm32/misc/svd/STM32F7x7.svd",
             "internalConsoleOptions": "openOnSessionStart"
         }
     ]

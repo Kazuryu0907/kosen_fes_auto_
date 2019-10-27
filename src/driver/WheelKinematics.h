@@ -1,4 +1,5 @@
 #include "math.h"
+#include "mbed.h"
 
 #ifdef Arduino
 #define SCALE_UNIT uint8_t
@@ -22,7 +23,7 @@ public:
 
   KinematicsType getKinematicsType() { return kinematicsType; }
   void getScale(double, double, double, double, SCALE_UNIT*);
-
+  void controlMotor(PwmOut *pwm,SCALE_UNIT*);
 private:
   KinematicsType kinematicsType;
   SCALE_UNIT maxAllocateOutput;
@@ -30,4 +31,5 @@ private:
   void getOmniKinematics3wdScale(double, double, double, double, SCALE_UNIT*);
   void getOmniKinematics4wdScale(double, double, double, double, SCALE_UNIT*);
   void getMechanumKinematics4wdScale(double, double, double, double, SCALE_UNIT*);
+  
 };

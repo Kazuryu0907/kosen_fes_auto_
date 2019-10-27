@@ -1,5 +1,6 @@
 #include "WheelKinematics.h"
 
+
 void WheelKinematics::getScale(double x, double y, double yaw, double yawAngle, SCALE_UNIT *scale)
 {
     switch (kinematicsType)
@@ -65,4 +66,17 @@ void WheelKinematics::getMechanumKinematics4wdScale(double x, double y, double y
     scale[1] = x * cos(ToRadian(yawAngle + 315)) + y * sin(ToRadian(yawAngle + 315)) + yaw;
     scale[2] = x * cos(ToRadian(yawAngle +  45)) + y * sin(ToRadian(yawAngle +  45)) + yaw;
     scale[3] = x * cos(ToRadian(yawAngle + 135)) + y * sin(ToRadian(yawAngle + 135)) + yaw;
+}
+
+void WheelKinematics::controlMotor(PwmOut *WheelPins,SCALE_UNIT *driverPWMOutput)
+{
+    for(int i = 0;i<4;i++){
+      if(driverPWMOutput[i] > 0){
+        WheelPins[i*2] = driverPWMOutput[i];
+        WheelPins[i*2+1] = 0;
+      }else{
+        WheelPins[i*2] = 0;
+        WheelPins[i*2+1] = driverPWMOutput[i];
+      }
+    }
 }
