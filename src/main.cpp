@@ -5,14 +5,14 @@
 #include "driver/MWodometry.h"
 #include "driver/WheelKinematics.h"
 
-
+#define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 struct
 {
   PinName XAxisAPulse = PF_9;
   PinName XAxisBPulse = PF_8;
   PinName XAxisIndexPulse = NC;
-  PinName YAxisAPulse = PA_4_ALT0;
-  PinName YAxisBPulse = PB_0_ALT0;
+  PinName YAxisAPulse = PB_0;
+  PinName YAxisBPulse = PA_4;
   PinName YAxisIndexPulse = NC;
 } OdometryPin;
 
@@ -36,6 +36,11 @@ PwmOut RBB(PD_13);
 PwmOut LBA(PD_14);
 PwmOut LBB(PD_15);
 
+struct
+{
+  double MaxPwm = 0.2;
+}Pwms;
+
 PwmOut WheelPins[8] = {
   RFA,RFB,LFA,LFB,RBA,RBB,LBA,LBB
 };
@@ -56,7 +61,9 @@ struct baudRate
 } SerialBaud;
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
+Timer TimerForMove;
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
+
 QEI encoderXAxis(OdometryPin.XAxisAPulse,
                  OdometryPin.XAxisBPulse,
                  OdometryPin.XAxisIndexPulse,
@@ -70,6 +77,7 @@ QEI encoderYAxis(OdometryPin.YAxisAPulse,
                  &TimerForQEI,
                  QEI::X2_ENCODING);
 
+
 MWodometry odometryXAxis(encoderXAxis,
                          Robot.encoderPPRHigh,
                          Robot.encoderAttachedWheelRadius);
@@ -77,24 +85,25 @@ MWodometry odometryYAxis(encoderYAxis,
                          Robot.encoderPPRHigh,
                          Robot.encoderAttachedWheelRadius);
 
-WheelKinematics wheelKinematics(WheelKinematics::Mechanum4WD, 0.3);
+WheelKinematics wheelKinematics(WheelKinematics::Mechanum4WD,Pwms.MaxPwm);
 
-PIDController pidObX(0.1, 0.05, 0);
-PIDController pidObY(0.1, 0.05, 0);
+PIDController pidObX(0.03, 0.0001, 0);
+PIDController pidObY(0.03, 0.0001, 0);
 PIDController pidObYaw(0.01, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
 
-float TargetXY[][2] = {0,100.0f};
+float TargetXYy[][2] = {{0,100.0f},{0,-100.0f}};
 int currentPoint = 0; 
 
-enum {
-  UP,
-  LEFT
-  }MovingStatus;
-  
 
-void update(float *currentXLocation,float *currentYLocation){
+void setup(){
+  TimerForMove.start();
+}  
+
+
+void update(double *currentXLocation,double *currentYLocation){
+  
   IMU.update();
   double xTemp = odometryXAxis.getDistance();
   odometryXAxis.setDistance(0);
@@ -105,33 +114,45 @@ void update(float *currentXLocation,float *currentYLocation){
   *currentYLocation += xTemp * sin(ToRadian(IMU.getYaw()));
   *currentXLocation -= yTemp * sin(ToRadian(IMU.getYaw()));
   *currentYLocation += yTemp * cos(ToRadian(IMU.getYaw()));
+  
+  
 
-  serial.printf("%f%s%f\n",*currentYLocation,":",*currentYLocation);
-
-  pidObX.update(TargetXY[currentPoint][0],*currentXLocation);
-  pidObY.update(TargetXY[currentPoint][1],*currentYLocation);
-
+  pidObX.update(TargetXYy[currentPoint][0],*currentXLocation);
+  pidObY.update(TargetXYy[currentPoint][1],*currentYLocation);
+  pidObYaw.update(0.0,IMU.getYaw());
   double pidX = pidObX.getTerm();
   double pidY = pidObY.getTerm();
   double pidYaw = pidObYaw.getTerm();
-
+  serial.printf("%f%s%f%s%f%s%f%s%f\n",IMU.getYaw(),":",pidX,":",pidY,"  ",*currentXLocation,":",*currentYLocation);
   wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
-  wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
+  
+    for(int i = 0;i<4;i++){
+      if(driverPWMOutput[i] > 0){
+        WheelPins[i*2] = driverPWMOutput[i];
+        WheelPins[i*2+1] = 0;
+      }else{
+        WheelPins[i*2] = 0;
+        WheelPins[i*2+1] = -driverPWMOutput[i];
+      }
+    }
+  
 }
 
 
 int main(){
-    float currentXLocation,currentYLocation;
-
-    pidObX.setOutputLimit(0.30f);
-    pidObY.setOutputLimit(0.30f);
-    pidObX.setOutputLimit(0.30f);
+    double currentXLocation,currentYLocation;
+    
+    pidObX.setOutputLimit(Pwms.MaxPwm);
+    pidObY.setOutputLimit(Pwms.MaxPwm);
+    pidObX.setOutputLimit(Pwms.MaxPwm);
     serial.printf("%s","setupIMU:");
     IMU.setup();
     serial.printf("%s\n","END");
     for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
+    setup();
     while(1){
       update(&currentXLocation,&currentYLocation);
+    
   } 
 
 }

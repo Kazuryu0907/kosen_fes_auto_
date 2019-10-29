@@ -60,12 +60,12 @@ void WheelKinematics::getOmniKinematics4wdScale(double x, double y, double yaw, 
 
 void WheelKinematics::getMechanumKinematics4wdScale(double x, double y, double yaw, double yawAngle, SCALE_UNIT *scale)
 {
-    //逆運動学を使って各軸の移動量からモータの回転方向・量を計算する
-    //モーターの正転は反時計回り scale[0]はFL
-    scale[0] = x * cos(ToRadian(yawAngle + 225)) + y * sin(ToRadian(yawAngle + 225)) + yaw;
-    scale[1] = x * cos(ToRadian(yawAngle + 315)) + y * sin(ToRadian(yawAngle + 315)) + yaw;
-    scale[2] = x * cos(ToRadian(yawAngle +  45)) + y * sin(ToRadian(yawAngle +  45)) + yaw;
-    scale[3] = x * cos(ToRadian(yawAngle + 135)) + y * sin(ToRadian(yawAngle + 135)) + yaw;
+    //逆運動学を使って各軸の移動量からモータの回転方向・量を計算す
+    //RF LF RB LB
+    scale[0] = x * cos(ToRadian(yawAngle + 135)) + y * sin(ToRadian(yawAngle + 135)) + yaw;
+    scale[1] = x * cos(ToRadian(yawAngle + 45)) + y * sin(ToRadian(yawAngle + 45)) - yaw;
+    scale[2] = x * cos(ToRadian(yawAngle + 45)) + y * sin(ToRadian(yawAngle + 45)) + yaw;
+    scale[3] = x * cos(ToRadian(yawAngle +  135)) + y * sin(ToRadian(yawAngle +  135)) - yaw;
 }
 
 void WheelKinematics::controlMotor(PwmOut *WheelPins,SCALE_UNIT *driverPWMOutput)
