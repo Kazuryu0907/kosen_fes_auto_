@@ -6,6 +6,12 @@
 #include "driver/WheelKinematics.h"
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
+
+typedef enum{
+  Bath=1,
+  Sheet
+}MechanismType;
+
 struct
 {
   PinName XAxisAPulse = PF_9;
@@ -93,11 +99,21 @@ PIDController pidObYaw(0.01, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
 
-float TargetXYy[][2] = {{0,100.0f},{0,-100.0f}};
+float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
 
 void setup(){
+  pidObX.setOutputLimit(Pwms.MaxPwm);
+  pidObY.setOutputLimit(Pwms.MaxPwm);
+  pidObX.setOutputLimit(Pwms.MaxPwm);
+
+  serial.printf("%s","setupIMU:");
+  IMU.setup();
+  serial.printf("%s\n","END");
+
+  for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
+  
   TimerForMove.start();
 }  
 
@@ -120,12 +136,16 @@ void update(double *currentXLocation,double *currentYLocation){
   pidObX.update(TargetXYy[currentPoint][0],*currentXLocation);
   pidObY.update(TargetXYy[currentPoint][1],*currentYLocation);
   pidObYaw.update(0.0,IMU.getYaw());
+
   double pidX = pidObX.getTerm();
   double pidY = pidObY.getTerm();
   double pidYaw = pidObYaw.getTerm();
+
   serial.printf("%f%s%f%s%f%s%f%s%f\n",IMU.getYaw(),":",pidX,":",pidY,"  ",*currentXLocation,":",*currentYLocation);
   wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
-  
+  wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
+
+  /*
     for(int i = 0;i<4;i++){
       if(driverPWMOutput[i] > 0){
         WheelPins[i*2] = driverPWMOutput[i];
@@ -135,20 +155,23 @@ void update(double *currentXLocation,double *currentYLocation){
         WheelPins[i*2+1] = -driverPWMOutput[i];
       }
     }
-  
+    */
+   switch (currentPoint)
+   {
+   case Bath:
+
+   break;
+
+   case Sheet:
+
+   break;
+   }
+
 }
 
 
 int main(){
     double currentXLocation,currentYLocation;
-    
-    pidObX.setOutputLimit(Pwms.MaxPwm);
-    pidObY.setOutputLimit(Pwms.MaxPwm);
-    pidObX.setOutputLimit(Pwms.MaxPwm);
-    serial.printf("%s","setupIMU:");
-    IMU.setup();
-    serial.printf("%s\n","END");
-    for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
     setup();
     while(1){
       update(&currentXLocation,&currentYLocation);
