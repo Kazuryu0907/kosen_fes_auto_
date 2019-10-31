@@ -8,7 +8,8 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
-#define MANUAL
+//#define MANUAL
+
 #define DEBUG
 
 int arrayLength = 10;
@@ -144,7 +145,7 @@ int points_blue[][3] = {
     {BACK,5100-roboy-a,0}
     };
 */
-float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0},{}};//X Y MechanismType
+float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
 
@@ -162,10 +163,10 @@ void setup(){
   TimerForMove.start();
 }  
 
-void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t R2,u_int8_t L2){
+void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t Yaw){
   pidObX.update(XLocation,0);
   pidObY.update(YLocation,0);
-  pidObYaw.update(L2-R2*0.05,0);//iF X is LOW
+  pidObYaw.update(Yaw*0.05,0);//iF X is LOW
 
   double pidX = pidObX.getTerm();
   double pidY = pidObY.getTerm();
@@ -281,14 +282,16 @@ int main(){
     double currentXLocation,currentYLocation;
     setup();
     while(1){
+      IMU.update();
       #ifdef MANUAL
         ReceivePacket();
+        update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
         #ifdef DEBUG
           serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
         #endif
+      #else
+        update(&currentXLocation,&currentYLocation);
       #endif
-      IMU.update();
-      update(&currentXLocation,&currentYLocation);
   } 
 
 }
