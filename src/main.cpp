@@ -9,6 +9,7 @@
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
 int arrayLength = 10;
+
 typedef enum{
   Bath=1,
   Sheet
@@ -23,6 +24,12 @@ struct
   PinName YAxisBPulse = PA_4;
   PinName YAxisIndexPulse = NC;
 } OdometryPin;
+
+struct
+{
+  PinName LimRight = PG_10;
+  PinName LimLeft = PG_15;
+}LimitPin;
 
 struct
 {
@@ -104,7 +111,21 @@ Serial serial(USBTX, USBRX);
 CheckFin chObX(20,10);
 CheckFin chObY(20,10);
 
-float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
+DigitalIn LimitRight(LimitPin.LimRight);
+DigitalIn LimitLeft(LimitPin.LimLeft);
+/*
+int points_blue[][3] = {
+    {UP,5900-a,0},
+    {LEFT,3575,1},
+    {RIGHT,3575,0},
+    {BACK,5900-a,0},
+    {UP,5100-roboy-a,0},
+    {LEFT,3575,-1},
+    {RIGHT,3575,0},
+    {BACK,5100-roboy-a,0}
+    };
+*/
+float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0},{}};//X Y MechanismType
 int currentPoint = 0; 
 
 
@@ -152,6 +173,7 @@ void update(double *currentXLocation,double *currentYLocation){
 
   if(chObX.isEnd() && chObY.isEnd())
   {
+    printf("%s\n","//////////////////next//////////////////");
     currentPoint++;
     chObX.reset();
     chObY.reset();
