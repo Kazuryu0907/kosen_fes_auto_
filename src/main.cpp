@@ -8,6 +8,9 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
+#define MANUAL
+#define DEBUG
+
 int arrayLength = 10;
 
 typedef enum{
@@ -75,6 +78,21 @@ struct baudRate
   const long SoftwareSerial = 115200;
 } SerialBaud;
 
+struct
+{
+  int LocationX;
+  int LocationY;
+  int Yaw;
+  bool TRIANGLE;
+  bool CIRCLE;
+  bool CROSS;
+  bool SQUARE;
+  int count;
+  float offset_X = 0;
+  float offset_Y = 0;
+  int sampling = 100;
+}ManualVaris;
+
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
@@ -107,6 +125,7 @@ PIDController pidObY(0.03, 0.0001, 0);
 PIDController pidObYaw(0.01, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
+Serial SerialControl(PB_9,PB_8);
 
 CheckFin chObX(20,10);
 CheckFin chObY(20,10);
@@ -133,7 +152,7 @@ void setup(){
   pidObX.setOutputLimit(Pwms.MaxPwm);
   pidObY.setOutputLimit(Pwms.MaxPwm);
   pidObX.setOutputLimit(Pwms.MaxPwm);
-
+  SerialControl.baud(SerialBaud.SoftwareSerial);
   serial.printf("%s","setupIMU:");
   IMU.setup();
   serial.printf("%s\n","END");
@@ -143,11 +162,23 @@ void setup(){
   TimerForMove.start();
 }  
 
+void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t R2,u_int8_t L2){
+  pidObX.update(XLocation,0);
+  pidObY.update(YLocation,0);
+  pidObYaw.update(L2-R2*0.05,0);//iF X is LOW
 
+  double pidX = pidObX.getTerm();
+  double pidY = pidObY.getTerm();
+  double pidYaw = pidObYaw.getTerm();
+
+  serial.printf("%f%s%f%s%f%s%d%s%d\n",IMU.getYaw(),":",pidX,":",pidY,"  ",XLocation,":",YLocation);
+  wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
+  wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
+}
 
 void update(double *currentXLocation,double *currentYLocation){
   
-  IMU.update();
+  
   double xTemp = odometryXAxis.getDistance();
   odometryXAxis.setDistance(0);
   double yTemp = odometryYAxis.getDistance();
@@ -199,11 +230,64 @@ void update(double *currentXLocation,double *currentYLocation){
 
 }
 
+typedef enum{
+  X = 1,Y,R,L,B
+}EnumPacket;
+
+void ReceivePacket()
+{
+  static int countPacket = 0;
+  if(SerialControl.readable())
+  {
+    u_int8_t val = SerialControl.getc();
+    if(val == 255)countPacket = 1;
+    switch(countPacket)
+    {
+      case X:
+        ManualVaris.count++;
+        if(ManualVaris.count > ManualVaris.sampling)ManualVaris.offset_X += val;
+        else if(ManualVaris.count == ManualVaris.sampling)ManualVaris.offset_X /= ManualVaris.sampling;
+        else  ManualVaris.LocationX = (int)val - ManualVaris.offset_X;
+      break;
+      case Y:
+        if(ManualVaris.count > ManualVaris.sampling)ManualVaris.offset_Y += val;
+        else if(ManualVaris.count == ManualVaris.sampling)ManualVaris.offset_Y /= ManualVaris.sampling;
+        else  ManualVaris.LocationY = (int)val - ManualVaris.sampling;
+      break;
+      case R:
+        if(val < 3)val = 0;
+        ManualVaris.Yaw = -val;  
+      break;
+      case L:
+        if(val < 3)val = 0;
+        ManualVaris.Yaw += val;  
+      break;
+      case B:
+        if(val & 0b1000)ManualVaris.TRIANGLE = 1;
+        else ManualVaris.TRIANGLE = 0;
+        if(val & 0b0100)ManualVaris.CIRCLE = 1;
+        else ManualVaris.CIRCLE = 0;
+        if(val & 0b0010)ManualVaris.CROSS = 1;
+        else ManualVaris.CROSS = 0;
+        if(val & 0b0001)ManualVaris.SQUARE = 1;
+        else ManualVaris.SQUARE = 0;
+      break;
+    }
+    countPacket++;
+  }
+}
 
 int main(){
     double currentXLocation,currentYLocation;
     setup();
     while(1){
+      #ifdef MANUAL
+        ReceivePacket();
+        #ifdef DEBUG
+          serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
+        #endif
+      #endif
+      IMU.update();
       update(&currentXLocation,&currentYLocation);
   } 
 
