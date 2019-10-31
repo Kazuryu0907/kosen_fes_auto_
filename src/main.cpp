@@ -4,9 +4,11 @@
 #include "driver/PIDController.h"
 #include "driver/MWodometry.h"
 #include "driver/WheelKinematics.h"
+#include "other/CheckFin.h"
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
+int arrayLength = 10;
 typedef enum{
   Bath=1,
   Sheet
@@ -99,6 +101,9 @@ PIDController pidObYaw(0.01, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
 
+CheckFin chObX(20,10);
+CheckFin chObY(20,10);
+
 float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
@@ -116,6 +121,7 @@ void setup(){
   
   TimerForMove.start();
 }  
+
 
 
 void update(double *currentXLocation,double *currentYLocation){
@@ -141,22 +147,24 @@ void update(double *currentXLocation,double *currentYLocation){
   double pidY = pidObY.getTerm();
   double pidYaw = pidObYaw.getTerm();
 
+  chObX.update(pidX);
+  chObY.update(pidY);
+
+  if(chObX.isEnd() && chObY.isEnd())
+  {
+    currentPoint++;
+    chObX.reset();
+    chObY.reset();
+    *currentXLocation = 0;
+    *currentYLocation = 0;
+  }
+
   serial.printf("%f%s%f%s%f%s%f%s%f\n",IMU.getYaw(),":",pidX,":",pidY,"  ",*currentXLocation,":",*currentYLocation);
   wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
 
-  /*
-    for(int i = 0;i<4;i++){
-      if(driverPWMOutput[i] > 0){
-        WheelPins[i*2] = driverPWMOutput[i];
-        WheelPins[i*2+1] = 0;
-      }else{
-        WheelPins[i*2] = 0;
-        WheelPins[i*2+1] = -driverPWMOutput[i];
-      }
-    }
-    */
-   switch (currentPoint)
+
+   switch ((int)TargetXYy[currentPoint][2])
    {
    case Bath:
 
@@ -175,7 +183,6 @@ int main(){
     setup();
     while(1){
       update(&currentXLocation,&currentYLocation);
-    
   } 
 
 }
