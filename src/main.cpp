@@ -283,6 +283,7 @@ void ReceivePacket()
 int main(){
     double currentXLocation,currentYLocation;
     //setup();
+    SerialControl.format(7,1);
     SerialControl.baud(SerialBaud.SoftwareSerial);
     while(1){
       //IMU.update();
