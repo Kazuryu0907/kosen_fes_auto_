@@ -8,7 +8,7 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
-//#define MANUAL
+#define MANUAL
 
 #define DEBUG
 
@@ -126,13 +126,14 @@ PIDController pidObY(0.03, 0.0001, 0);
 PIDController pidObYaw(0.01, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
-Serial SerialControl(PB_9,PB_8);
+Serial SerialControl(PD_5,PD_6);
 
 CheckFin chObX(20,10);
 CheckFin chObY(20,10);
 
 DigitalIn LimitRight(LimitPin.LimRight);
 DigitalIn LimitLeft(LimitPin.LimLeft);
+
 /*
 int points_blue[][3] = {
     {UP,5900-a,0},
@@ -153,7 +154,6 @@ void setup(){
   pidObX.setOutputLimit(Pwms.MaxPwm);
   pidObY.setOutputLimit(Pwms.MaxPwm);
   pidObX.setOutputLimit(Pwms.MaxPwm);
-  SerialControl.baud(SerialBaud.SoftwareSerial);
   serial.printf("%s","setupIMU:");
   IMU.setup();
   serial.printf("%s\n","END");
@@ -162,6 +162,7 @@ void setup(){
   
   TimerForMove.start();
 }  
+
 
 void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t Yaw){
   pidObX.update(XLocation,0);
@@ -176,6 +177,7 @@ void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t Yaw){
   wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
 }
+
 
 void update(double *currentXLocation,double *currentYLocation){
   
@@ -241,11 +243,10 @@ void ReceivePacket()
   if(SerialControl.readable())
   {
     u_int8_t val = SerialControl.getc();
-    if(val == 255)countPacket = 1;
+    serial.printf("%d\n",val);
     switch(countPacket)
     {
       case X:
-        ManualVaris.count++;
         if(ManualVaris.count > ManualVaris.sampling)ManualVaris.offset_X += val;
         else if(ManualVaris.count == ManualVaris.sampling)ManualVaris.offset_X /= ManualVaris.sampling;
         else  ManualVaris.LocationX = (int)val - ManualVaris.offset_X;
@@ -275,19 +276,23 @@ void ReceivePacket()
       break;
     }
     countPacket++;
+    if(val == 255)countPacket = 1;
   }
 }
 
 int main(){
     double currentXLocation,currentYLocation;
-    setup();
+    //setup();
+    SerialControl.baud(SerialBaud.SoftwareSerial);
     while(1){
-      IMU.update();
+      //IMU.update();
       #ifdef MANUAL
-        ReceivePacket();
-        update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
+        //ReceivePacket();
+        if(SerialControl.readable())serial.printf("%s\n","able");//serial.printf("%c\n",SerialControl.getc());
+        else serial.printf("%s\n","unable");
+        //update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
         #ifdef DEBUG
-          serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
+          //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
         #endif
       #else
         update(&currentXLocation,&currentYLocation);
