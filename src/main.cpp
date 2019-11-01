@@ -280,6 +280,24 @@ void ReceivePacket()
   }
 }
 
+void Mechanisms(){
+  if(ManualVaris.TRIANGLE)
+  {
+
+  }
+  if(ManualVaris.CIRCLE)
+  {
+
+  }
+  if(ManualVaris.CROSS)
+  {
+
+  }
+  if(ManualVaris.SQUARE)
+  {
+
+  }
+}
 int main(){
     double currentXLocation,currentYLocation;
     //setup();
@@ -289,6 +307,7 @@ int main(){
       //IMU.update();
       #ifdef MANUAL
         //ReceivePacket();
+        //Mechanisms();
         if(SerialControl.readable())serial.printf("%s\n","able");//serial.printf("%c\n",SerialControl.getc());
         else serial.printf("%s\n","unable");
         //update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
