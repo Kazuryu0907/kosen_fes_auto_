@@ -3,11 +3,12 @@
 class CheckFin
 {
     public:
-        CheckFin(int arraylengh,int c):countFin(c),arrayLength(arraylengh){};
+        CheckFin(int arraylengh,int c):TargetcountFin(c),arrayLength(arraylengh){};
         void update(double term);
         bool isEnd();
         void reset();
     private:
+        int TargetcountFin;
         int countFin;
         int arrayLength;
         double array[100];
