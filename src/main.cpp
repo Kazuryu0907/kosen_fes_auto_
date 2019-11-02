@@ -96,7 +96,10 @@ struct
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
+char buf[10];
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
+
+I2C i2cControl(I2CPin.IMUSDA,I2CPin.IMUSCL);
 
 QEI encoderXAxis(OdometryPin.XAxisAPulse,
                  OdometryPin.XAxisBPulse,
@@ -310,8 +313,11 @@ int main(){
       #ifdef MANUAL
         //ReceivePacket();
         //Mechanisms();
-        if(SerialControl.readable())serial.printf("%s\n","able");//serial.printf("%c\n",SerialControl.getc());
-        else serial.printf("%s\n","unable");
+        i2cControl.read(0x08<<1,buf,2);
+        serial.printf("%d,",buf[0]);
+        serial.printf("%d\n",buf[1]);
+        //if(SerialControl.readable())serial.printf("%s\n","able");//serial.printf("%c\n",SerialControl.getc());
+        //else serial.printf("%s\n","unable");
         //update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
         #ifdef DEBUG
           //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);

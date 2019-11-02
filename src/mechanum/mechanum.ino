@@ -4,10 +4,16 @@ USB Usb;
 BTD Btd(&Usb);       //無線
 PS4BT PS4(&Btd);     //無線
 #define DEBUG
+
+#define ADDR 0x08
+
+void requestEvent();
 void setup() {
   //通信速度
   Serial.begin(115200);
-  Serial1.begin(115200);
+  //Serial1.begin(115200);
+  Wire.begin(ADDR);
+  Wire.onRequest(requestEvent);
   //PS4 BT関係
   while (!Serial);
   if (Usb.Init() == -1) {
@@ -66,10 +72,16 @@ void loop() {
 
 void SendPacket()
 {
-  Serial1.println('C');
+  //Serial1.println('C');
   //Serial1.write(StickX);
   //Serial1.write(StickY);
   //Serial1.write(AnalogR2);
   //Serial1.write(AnalogL2);
   //Serial1.write(Buttons);
+}
+
+void requestEvent()
+{
+  Wire.write(0x1);
+  Wire.write(0x10);
 }

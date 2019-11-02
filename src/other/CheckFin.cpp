@@ -6,7 +6,8 @@ void CheckFin::update(double term)
   shift(array);
   array[0] = term;
   //printf("%d\n",round(round(*array,-5) - round(*(array+arrayLength-1),-5),-5)==0?1:0);
-  if(round(round(*array,-5) - round(*(array+arrayLength-1),-5),-5) == 0)
+  //if(round(round(*array,-5) - round(*(array+arrayLength-1),-5),-5) == 0)
+  if(round(*array - *(array+arrayLength-1),-5) == 0)
   {
     countFin++;
   }else countFin = 0;
