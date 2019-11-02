@@ -1,11 +1,12 @@
 #include "CheckFin.h"
-
+#include "mbed.h"
+Serial ss(USBTX,USBRX);
 void CheckFin::update(double term)
 {
   shift(array);
   array[0] = term;
-  //printf("%d\n",round(*array,-5) - round(*(array+arrayLength-1),-5));
-  if(round(array[0],-5) == round(array[arrayLength-1],-5))if(array[0] < 1)countFin++;
+  ss.printf("%f\n",round(*array,-5) - round(*(array+arrayLength-1),-5));
+  if(round(array[0],-5) == round(array[arrayLength-1],-5))countFin++;
   if(countFin > 10)check = true;
   else check = false;
 }

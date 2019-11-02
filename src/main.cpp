@@ -8,7 +8,7 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
-#define MANUAL
+//#define MANUAL
 
 #define DEBUG
 
@@ -202,8 +202,8 @@ void update(double *currentXLocation,double *currentYLocation){
   double pidY = pidObY.getTerm();
   double pidYaw = pidObYaw.getTerm();
 
-  chObX.update(pidX);
-  chObY.update(pidY);
+  if(abs(*currentXLocation) > abs(TargetXYy[currentPoint][0])*0.1)chObX.update(*currentXLocation);
+  if(abs(*currentYLocation) > abs(TargetXYy[currentPoint][1])*0.1)chObY.update(*currentYLocation);
 
   if(chObX.isEnd() && chObY.isEnd())
   {
@@ -300,8 +300,10 @@ void Mechanisms(){
 }
 int main(){
     double currentXLocation,currentYLocation;
-    //setup();
-    SerialControl.format(7,1);
+    #ifndef MANUAL
+      setup();
+    #endif
+    //SerialControl.format(7,1);
     SerialControl.baud(SerialBaud.SoftwareSerial);
     while(1){
       //IMU.update();

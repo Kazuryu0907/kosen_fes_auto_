@@ -76,7 +76,7 @@ void WheelKinematics::controlMotor(PwmOut *WheelPins,SCALE_UNIT *driverPWMOutput
         WheelPins[i*2+1] = 0;
       }else{
         WheelPins[i*2] = 0;
-        WheelPins[i*2+1] = driverPWMOutput[i];
+        WheelPins[i*2+1] = -driverPWMOutput[i];
       }
     }
 }
