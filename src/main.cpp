@@ -300,7 +300,6 @@ int main(){
       IMU.update();
       #ifdef MANUAL
         ReceivePacket();
-        //Mechanisms();
         update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
         //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
       #else
