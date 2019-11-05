@@ -83,7 +83,7 @@ void WheelKinematics::controlMotor(PwmOut *WheelPins,SCALE_UNIT *driverPWMOutput
 
 void WheelKinematics::controlMotor(PwmOut *WheelPins,SCALE_UNIT *driverPWMOutput,int s,int e)
 {
-    for(int i = s;i<e*2;i++){
+    for(int i = s;i<e;i++){
       if(driverPWMOutput[i] > 0){
         WheelPins[i*2] = driverPWMOutput[i];
         WheelPins[i*2+1] = 0;

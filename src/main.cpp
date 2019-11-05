@@ -69,8 +69,8 @@ PwmOut WheelPins[8] = {
   RFA,RFB,LFA,LFB,RBA,RBB,LBA,LBB
 };
 
-PwmOut HGA(PF_8);
-PwmOut HGB(PF_7);
+PwmOut HGA(PE_11);
+PwmOut HGB(PE_9);
 PwmOut MechanismPins[]{
   HGA,HGB
 };
@@ -197,7 +197,7 @@ void Mechanisms(double *pidYaw){
   }
   if(ManualVaris.CROSS)
   {
-    pidObYaw.update(0,IMU.getYaw());//iF X is LOW
+    pidObYaw.update(0,IMU.getYaw());
     *pidYaw = pidObYaw.getTerm();
   }
   if(ManualVaris.SQUARE)
@@ -206,10 +206,11 @@ void Mechanisms(double *pidYaw){
   }
 }
 
-void UpdateMechanism(int HangerY){
+void updateMechanism(){
   double mechanismPWMOutput[1];
-  mechanismPWMOutput[0] = HangerY*0.00787*0.3;
-  wheelKinematics.controlMotor(MechanismPins,driverPWMOutput,0,1);
+  mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;
+  serial.printf("%f\n",mechanismPWMOutput[0]);
+  wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0,1);
 }
 
 void setup(){
@@ -221,7 +222,7 @@ void setup(){
   serial.printf("%s\n","END");
 
   for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
-  
+  for(int i = 0;i<2;i++)MechanismPins[i].period_ms(1);
   TimerForMove.start();
 }  
 
@@ -229,15 +230,15 @@ void setup(){
 void update(int XLocation,int YLocation,int Yaw){
 
   double pidYaw;
-  Mechanisms(&pidYaw);
   pidYaw = (double)Yaw*0.001;
-  
-  serial.printf("%f %d:%d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw);
+  Mechanisms(&pidYaw);
+  serial.printf("%f %d:%d:%d  %d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY);
   wheelKinematics.getScale((double)XLocation*0.002,(double)YLocation*0.002,pidYaw,IMU.getYaw(),driverPWMOutput);
+  updateMechanism();
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
 }
 
-
+#ifndef MANUAL
 void update(double *currentXLocation,double *currentYLocation){
   
   
@@ -291,7 +292,7 @@ void update(double *currentXLocation,double *currentYLocation){
    }
 
 }
-
+#endif
 
 int main(){
     double currentXLocation,currentYLocation;
