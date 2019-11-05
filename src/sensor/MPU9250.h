@@ -15,7 +15,12 @@ public:
   MPU9250(PinName, PinName, int);
   void setup(); //オフセット値の計算
   void update();
-  double getYaw() { return yaw; }
+  double getYaw() { 
+    if(yaw < 0)yaw += 360;
+    if(yaw >= 360)yaw -= 360;
+    if(yaw >= 180)yaw -= 360;
+    return yaw; 
+    }
   double getOffsetYaw() { return offsetGyroZ; }
 
   void setYaw(double targetYaw)
