@@ -26,9 +26,9 @@ public:
   {
     offsetGyroZ = targetOffset;
   }
-
-private:
   I2C *i2c_;
+private:
+  
   Timer *timer_;
 
   void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)

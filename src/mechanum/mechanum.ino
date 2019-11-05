@@ -1,18 +1,20 @@
 //PS4のヘッダーファイル
 #include<PS4BT.h>    //無線
+#include<Wire.h>
 USB Usb;
 BTD Btd(&Usb);       //無線
 PS4BT PS4(&Btd);     //無線
 #define DEBUG
 
 #define ADDR 0x08
-
+char Status = 'E';
 void requestEvent();
 void setup() {
   //通信速度
   Serial.begin(115200);
   //Serial1.begin(115200);
   Wire.begin(ADDR);
+  //Wire.setClock(400000);
   Wire.onRequest(requestEvent);
   //PS4 BT関係
   while (!Serial);
@@ -28,19 +30,23 @@ uint8_t StickY;
 uint8_t AnalogR2;
 uint8_t AnalogL2;
 uint8_t Buttons;
+uint8_t Hanger;
 void SendPacket();
 ButtonEnum buttons[4] = {TRIANGLE,CIRCLE,CROSS,SQUARE};
 void loop() {
+  
   Usb.Task();
 
   if (PS4.connected()) 
   { //通信中に実行
     // put your main code here, to run repeatedly:
+    Status = 'S';
     Buttons = 0;
     StickX =  PS4.getAnalogHat(LeftHatY);
     StickY =  PS4.getAnalogHat(LeftHatX);
     AnalogR2 = PS4.getAnalogButton(R2);
     AnalogL2 = PS4.getAnalogButton(L2);
+    Hanger = PS4.getAnalogHat(RightHatY);
     //Buttons = (int)PS4.getButtonPress(TRIANGLE) << 3 || (int)PS4.getButtonPress(CIRCLE) << 2 || (int)PS4.getButtonPress(CROSS) << 1 || (int)PS4.getButtonPress(SQUARE);
     for(int i = 0;i<4;i++){
       Buttons = Buttons | (int)PS4.getButtonPress(buttons[i]) << 3 - i;
@@ -59,29 +65,28 @@ void loop() {
       Serial.print("L2:");
       Serial.print(AnalogL2);
       Serial.print("Buttons:");
-      Serial.println(Buttons,BIN);
+      Serial.print(Buttons,BIN);
+      Serial.print("Hanger:");
+      Serial.println(Hanger);
     #endif
-    SendPacket();
+    //SendPacket();
       //接続を切る
     if (PS4.getButtonClick(PS)) {
+      Status = 'E';
       PS4.disconnect();
     }
+    
   }
 }
 //スティック
 
-void SendPacket()
-{
-  //Serial1.println('C');
-  //Serial1.write(StickX);
-  //Serial1.write(StickY);
-  //Serial1.write(AnalogR2);
-  //Serial1.write(AnalogL2);
-  //Serial1.write(Buttons);
-}
-
 void requestEvent()
 {
-  Wire.write(0x1);
-  Wire.write(0x10);
+  Wire.write(Status);
+  Wire.write(StickX);
+  Wire.write(StickY);
+  Wire.write(AnalogR2);
+  Wire.write(AnalogL2);
+  Wire.write(Buttons);
+  Wire.write(Hanger);
 }

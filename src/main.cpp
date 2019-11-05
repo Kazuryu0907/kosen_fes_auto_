@@ -8,7 +8,7 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
-//#define MANUAL
+#define MANUAL
 
 #define DEBUG
 
@@ -34,6 +34,11 @@ struct
   PinName LimRight = PG_10;
   PinName LimLeft = PG_15;
 }LimitPin;
+
+typedef enum
+{
+  STCONN,CONN,NOCONN
+}PS4Status;
 
 struct
 {
@@ -64,6 +69,11 @@ PwmOut WheelPins[8] = {
   RFA,RFB,LFA,LFB,RBA,RBB,LBA,LBB
 };
 
+PwmOut HGA(PF_8);
+PwmOut HGB(PF_7);
+PwmOut MechanismPins[]{
+  HGA,HGB
+};
 double driverPWMOutput[4]; 
 
 struct
@@ -88,15 +98,12 @@ struct
   bool CIRCLE;
   bool CROSS;
   bool SQUARE;
-  int count;
-  float offset_X = 0;
-  float offset_Y = 0;
-  int sampling = 100;
+  PS4Status Status = NOCONN;
+  int HangerY;
 }ManualVaris;
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
-char buf[10];
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
 
 I2C i2cControl(I2CPin.IMUSDA,I2CPin.IMUSCL);
@@ -152,6 +159,58 @@ int points_blue[][3] = {
 float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
+void ReceivePacket()
+{
+  char buf[7];
+  IMU.i2c_->read(0x08<<1,buf,7);
+  if(buf[0] == 'S')ManualVaris.Status = CONN;
+  else if(buf[0] == 'E')ManualVaris.Status = NOCONN;
+  if(ManualVaris.Status == CONN){
+    ManualVaris.LocationY = abs(buf[1] - 127) < 10?0:-buf[1] + 127;
+    ManualVaris.LocationX = abs(buf[2] - 127) < 10?0:buf[2] - 127;
+    ManualVaris.Yaw = -buf[3] + buf[4];
+    ManualVaris.TRIANGLE = buf[5] & 0b1000;
+    ManualVaris.CIRCLE = buf[5] & 0b0100;
+    ManualVaris.CROSS = buf[5] & 0b0010;
+    ManualVaris.SQUARE = buf[5] & 0b0001;
+    ManualVaris.HangerY = -(abs(buf[6] - 127) < 10?0:buf[6] - 127);
+  }else{
+    ManualVaris.LocationY = 0;
+    ManualVaris.LocationX = 0;
+    ManualVaris.Yaw = 0;
+    ManualVaris.TRIANGLE = 0;
+    ManualVaris.CIRCLE = 0;
+    ManualVaris.CROSS = 0;
+    ManualVaris.SQUARE = 0;
+    ManualVaris.HangerY = 0;
+  }
+}
+
+void Mechanisms(double *pidYaw){
+  if(ManualVaris.TRIANGLE)
+  {
+
+  }
+  if(ManualVaris.CIRCLE)
+  {
+    
+  }
+  if(ManualVaris.CROSS)
+  {
+    pidObYaw.update(0,IMU.getYaw());//iF X is LOW
+    *pidYaw = pidObYaw.getTerm();
+  }
+  if(ManualVaris.SQUARE)
+  {
+
+  }
+}
+
+void UpdateMechanism(int HangerY){
+  double mechanismPWMOutput[1];
+  mechanismPWMOutput[0] = HangerY*0.00787*0.3;
+  wheelKinematics.controlMotor(MechanismPins,driverPWMOutput,0,1);
+}
 
 void setup(){
   pidObX.setOutputLimit(Pwms.MaxPwm);
@@ -167,17 +226,14 @@ void setup(){
 }  
 
 
-void update(u_int8_t XLocation,u_int8_t YLocation,u_int8_t Yaw){
-  pidObX.update(XLocation,0);
-  pidObY.update(YLocation,0);
-  pidObYaw.update(Yaw*0.05,0);//iF X is LOW
+void update(int XLocation,int YLocation,int Yaw){
 
-  double pidX = pidObX.getTerm();
-  double pidY = pidObY.getTerm();
-  double pidYaw = pidObYaw.getTerm();
-
-  serial.printf("%f%s%f%s%f%s%d%s%d\n",IMU.getYaw(),":",pidX,":",pidY,"  ",XLocation,":",YLocation);
-  wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
+  double pidYaw;
+  Mechanisms(&pidYaw);
+  pidYaw = (double)Yaw*0.001;
+  
+  serial.printf("%f %d:%d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw);
+  wheelKinematics.getScale((double)XLocation*0.002,(double)YLocation*0.002,pidYaw,IMU.getYaw(),driverPWMOutput);
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
 }
 
@@ -236,92 +292,17 @@ void update(double *currentXLocation,double *currentYLocation){
 
 }
 
-typedef enum{
-  X = 1,Y,R,L,B
-}EnumPacket;
 
-void ReceivePacket()
-{
-  static int countPacket = 0;
-  if(SerialControl.readable())
-  {
-    u_int8_t val = SerialControl.getc();
-    serial.printf("%d\n",val);
-    switch(countPacket)
-    {
-      case X:
-        if(ManualVaris.count > ManualVaris.sampling)ManualVaris.offset_X += val;
-        else if(ManualVaris.count == ManualVaris.sampling)ManualVaris.offset_X /= ManualVaris.sampling;
-        else  ManualVaris.LocationX = (int)val - ManualVaris.offset_X;
-      break;
-      case Y:
-        if(ManualVaris.count > ManualVaris.sampling)ManualVaris.offset_Y += val;
-        else if(ManualVaris.count == ManualVaris.sampling)ManualVaris.offset_Y /= ManualVaris.sampling;
-        else  ManualVaris.LocationY = (int)val - ManualVaris.sampling;
-      break;
-      case R:
-        if(val < 3)val = 0;
-        ManualVaris.Yaw = -val;  
-      break;
-      case L:
-        if(val < 3)val = 0;
-        ManualVaris.Yaw += val;  
-      break;
-      case B:
-        if(val & 0b1000)ManualVaris.TRIANGLE = 1;
-        else ManualVaris.TRIANGLE = 0;
-        if(val & 0b0100)ManualVaris.CIRCLE = 1;
-        else ManualVaris.CIRCLE = 0;
-        if(val & 0b0010)ManualVaris.CROSS = 1;
-        else ManualVaris.CROSS = 0;
-        if(val & 0b0001)ManualVaris.SQUARE = 1;
-        else ManualVaris.SQUARE = 0;
-      break;
-    }
-    countPacket++;
-    if(val == 255)countPacket = 1;
-  }
-}
-
-void Mechanisms(){
-  if(ManualVaris.TRIANGLE)
-  {
-
-  }
-  if(ManualVaris.CIRCLE)
-  {
-
-  }
-  if(ManualVaris.CROSS)
-  {
-
-  }
-  if(ManualVaris.SQUARE)
-  {
-
-  }
-}
 int main(){
     double currentXLocation,currentYLocation;
-    #ifndef MANUAL
-      setup();
-    #endif
-    //SerialControl.format(7,1);
-    SerialControl.baud(SerialBaud.SoftwareSerial);
+    setup();
     while(1){
-      //IMU.update();
+      IMU.update();
       #ifdef MANUAL
-        //ReceivePacket();
+        ReceivePacket();
         //Mechanisms();
-        i2cControl.read(0x08<<1,buf,2);
-        serial.printf("%d,",buf[0]);
-        serial.printf("%d\n",buf[1]);
-        //if(SerialControl.readable())serial.printf("%s\n","able");//serial.printf("%c\n",SerialControl.getc());
-        //else serial.printf("%s\n","unable");
-        //update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
-        #ifdef DEBUG
-          //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
-        #endif
+        update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
+        //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
       #else
         update(&currentXLocation,&currentYLocation);
       #endif
