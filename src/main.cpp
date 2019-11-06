@@ -12,8 +12,6 @@
 
 #define DEBUG
 
-int arrayLength = 10;
-
 typedef enum{
   Bath=1,
   Sheet
@@ -77,7 +75,8 @@ PwmOut HGA(PE_11);
 PwmOut HGB(PE_9);
 PwmOut ENA(PE_5);
 PwmOut ENB(PE_6);
-PwmOut MechanismPins[]{
+
+PwmOut MechanismPins[]{//機構用pwmピン指定
   HGA,HGB,ENA,ENB
 };
 double driverPWMOutput[4]; 
@@ -110,7 +109,7 @@ struct
   int L1;
   int preR1;
   double RollPwm;
-}ManualVaris;
+}ManualVaris;//arduinoからくるDualShockの信号
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
@@ -160,7 +159,7 @@ DigitalIn LimitLeft(LimitPin.LimLeft);
 float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
-bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){
+bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){//バスタオル機構のロリコンがencoderPPRHigh分回ったかどうかの判定
   if(p->getPulses() < encoderPPRHigh)return(1);
   else
   {
@@ -169,7 +168,8 @@ bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){
   }
   serial.printf("%d\n",p->getPulses());
 }
-void ReceivePacket()
+
+void ReceivePacket()//arduinoから信号を受け取る
 {
   char buf[8];
   IMU.i2c_->read(0x08<<1,buf,8);
@@ -187,6 +187,7 @@ void ReceivePacket()
     ManualVaris.R1 = buf[7] & 0b10;
     ManualVaris.L1 = buf[7] & 0b01;
   }else{
+    //接続状態じゃなかったら初期化
     ManualVaris.LocationY = 0;
     ManualVaris.LocationX = 0;
     ManualVaris.Yaw = 0;
@@ -200,7 +201,7 @@ void ReceivePacket()
   }
 }
 
-void Mechanisms(double *pidYaw){
+void Mechanisms(double *pidYaw){//コントローラーのボタンが押されてた時の処理
   static double thisyaw;
   static bool isHigh = false;
   if(ManualVaris.TRIANGLE)
@@ -209,10 +210,10 @@ void Mechanisms(double *pidYaw){
   }
   if(isHigh)
   {
-    if(updateMechanismEnc(&odometryXAxis,12))ManualVaris.RollPwm = 0.1;//続行
+    if(updateMechanismEnc(&odometryXAxis,12))ManualVaris.RollPwm = 0.1;//まだ回る
     else
     {
-      ManualVaris.RollPwm = 0;
+      ManualVaris.RollPwm = 0;//止める
       isHigh = false;
     }
   } 
@@ -223,33 +224,33 @@ void Mechanisms(double *pidYaw){
   }
   if(ManualVaris.CROSS)
   {
-    pidObYaw.update(0,IMU.getYaw());
+    pidObYaw.update(0,IMU.getYaw());//初期角度に回転
     *pidYaw = pidObYaw.getTerm();
   }
   if(ManualVaris.SQUARE)
   {
 
   }
-  if(*pidYaw)
+  if(*pidYaw != 0)//コントローラーから回転の信号が来てるかどうか
   {
     thisyaw = IMU.getYaw();//reset
     TimerForRoll.reset();
   }else
-  {
-    if(TimerForRoll.read_ms() > 100){
+  {               //来てなかったら初期角度を維持
+    if(TimerForRoll.read_ms() > 500){
     pidObYaw.update(thisyaw,IMU.getYaw());
     *pidYaw = pidObYaw.getTerm();
     }
   }
-  if(ManualVaris.R1 && ManualVaris.L1){
+  if(ManualVaris.R1 && ManualVaris.L1){//初期角度を設定
     IMU.reset();
     thisyaw = 0;
   }
 }
 
-void updateMechanism(){
+void updateMechanism(){//機構用pwm出力
   double mechanismPWMOutput[2];
-  mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;
+  mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;//max0.3に抑える
   mechanismPWMOutput[1] = ManualVaris.RollPwm;
   serial.printf("%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1]);
   wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0,2);
