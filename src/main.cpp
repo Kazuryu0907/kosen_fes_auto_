@@ -75,8 +75,10 @@ PwmOut WheelPins[8] = {
 
 PwmOut HGA(PE_11);
 PwmOut HGB(PE_9);
+PwmOut ENA(PE_5);
+PwmOut ENB(PE_6);
 PwmOut MechanismPins[]{
-  HGA,HGB
+  HGA,HGB,ENA,ENB
 };
 double driverPWMOutput[4]; 
 
@@ -107,6 +109,7 @@ struct
   int R1;
   int L1;
   int preR1;
+  double RollPwm;
 }ManualVaris;
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
@@ -164,6 +167,7 @@ bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){
     p->setDistance(0);
     return(0);
   }
+  serial.printf("%d\n",p->getPulses());
 }
 void ReceivePacket()
 {
@@ -205,8 +209,13 @@ void Mechanisms(double *pidYaw){
   }
   if(isHigh)
   {
-    updateMechanismEnc(&odometryXAxis,12);//48/4
-  }
+    if(updateMechanismEnc(&odometryXAxis,12))ManualVaris.RollPwm = 0.1;//続行
+    else
+    {
+      ManualVaris.RollPwm = 0;
+      isHigh = false;
+    }
+  } 
 
   if(ManualVaris.CIRCLE)
   {
@@ -239,10 +248,11 @@ void Mechanisms(double *pidYaw){
 }
 
 void updateMechanism(){
-  double mechanismPWMOutput[1];
+  double mechanismPWMOutput[2];
   mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;
-  serial.printf("%f\n",mechanismPWMOutput[0]);
-  wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0,1);
+  mechanismPWMOutput[1] = ManualVaris.RollPwm;
+  serial.printf("%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1]);
+  wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0,2);
 }
 
 void setup(){
