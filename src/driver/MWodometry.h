@@ -28,6 +28,7 @@ public:
   */
   void setDistance(double);
 
+  int getPulses();
 private:
   QEI *QEIobj;
   int encoderResolution;

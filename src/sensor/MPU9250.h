@@ -21,6 +21,7 @@ public:
     if(yaw >= 180)yaw -= 360;
     return yaw; 
     }
+  void reset(){yaw = 0;}
   double getOffsetYaw() { return offsetGyroZ; }
 
   void setYaw(double targetYaw)

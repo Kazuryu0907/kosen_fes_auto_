@@ -43,7 +43,11 @@ typedef enum
 struct
 {
   const int encoderPPRLow = 48;
+  #ifdef MANUAL
+  const int encoderPPRHigh = 48;
+  #else
   const int encoderPPRHigh = 1024;
+  #endif
   // mini(50) omni
   const double encoderAttachedWheelRadius = 5.25;
   // max:0.7, recommend:0.64 //DEFAULT 0.5
@@ -100,10 +104,15 @@ struct
   bool SQUARE;
   PS4Status Status = NOCONN;
   int HangerY;
+  int R1;
+  int L1;
+  int preR1;
 }ManualVaris;
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
+Timer TimerForRoll;
+
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
 
 I2C i2cControl(I2CPin.IMUSDA,I2CPin.IMUSCL);
@@ -133,7 +142,7 @@ WheelKinematics wheelKinematics(WheelKinematics::Mechanum4WD,Pwms.MaxPwm);
 
 PIDController pidObX(0.03, 0.0001, 0);
 PIDController pidObY(0.03, 0.0001, 0);
-PIDController pidObYaw(0.01, 0.005, 0);
+PIDController pidObYaw(0.03, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
 Serial SerialControl(PD_5,PD_6);
@@ -144,25 +153,22 @@ CheckFin chObY(20,10);
 DigitalIn LimitRight(LimitPin.LimRight);
 DigitalIn LimitLeft(LimitPin.LimLeft);
 
-/*
-int points_blue[][3] = {
-    {UP,5900-a,0},
-    {LEFT,3575,1},
-    {RIGHT,3575,0},
-    {BACK,5900-a,0},
-    {UP,5100-roboy-a,0},
-    {LEFT,3575,-1},
-    {RIGHT,3575,0},
-    {BACK,5100-roboy-a,0}
-    };
-*/
+
 float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
+bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){
+  if(p->getPulses() < encoderPPRHigh)return(1);
+  else
+  {
+    p->setDistance(0);
+    return(0);
+  }
+}
 void ReceivePacket()
 {
-  char buf[7];
-  IMU.i2c_->read(0x08<<1,buf,7);
+  char buf[8];
+  IMU.i2c_->read(0x08<<1,buf,8);
   if(buf[0] == 'S')ManualVaris.Status = CONN;
   else if(buf[0] == 'E')ManualVaris.Status = NOCONN;
   if(ManualVaris.Status == CONN){
@@ -174,6 +180,8 @@ void ReceivePacket()
     ManualVaris.CROSS = buf[5] & 0b0010;
     ManualVaris.SQUARE = buf[5] & 0b0001;
     ManualVaris.HangerY = -(abs(buf[6] - 127) < 10?0:buf[6] - 127);
+    ManualVaris.R1 = buf[7] & 0b10;
+    ManualVaris.L1 = buf[7] & 0b01;
   }else{
     ManualVaris.LocationY = 0;
     ManualVaris.LocationX = 0;
@@ -183,14 +191,23 @@ void ReceivePacket()
     ManualVaris.CROSS = 0;
     ManualVaris.SQUARE = 0;
     ManualVaris.HangerY = 0;
+    ManualVaris.R1 = 0;
+    ManualVaris.L1 = 0;
   }
 }
 
 void Mechanisms(double *pidYaw){
+  static double thisyaw;
+  static bool isHigh = false;
   if(ManualVaris.TRIANGLE)
   {
-
+    isHigh = true;
   }
+  if(isHigh)
+  {
+    updateMechanismEnc(&odometryXAxis,12);//48/4
+  }
+
   if(ManualVaris.CIRCLE)
   {
     
@@ -203,6 +220,21 @@ void Mechanisms(double *pidYaw){
   if(ManualVaris.SQUARE)
   {
 
+  }
+  if(*pidYaw)
+  {
+    thisyaw = IMU.getYaw();//reset
+    TimerForRoll.reset();
+  }else
+  {
+    if(TimerForRoll.read_ms() > 100){
+    pidObYaw.update(thisyaw,IMU.getYaw());
+    *pidYaw = pidObYaw.getTerm();
+    }
+  }
+  if(ManualVaris.R1 && ManualVaris.L1){
+    IMU.reset();
+    thisyaw = 0;
   }
 }
 
@@ -220,10 +252,10 @@ void setup(){
   serial.printf("%s","setupIMU:");
   IMU.setup();
   serial.printf("%s\n","END");
-
   for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
   for(int i = 0;i<2;i++)MechanismPins[i].period_ms(1);
   TimerForMove.start();
+  TimerForRoll.start();
 }  
 
 
@@ -232,7 +264,7 @@ void update(int XLocation,int YLocation,int Yaw){
   double pidYaw;
   pidYaw = (double)Yaw*0.001;
   Mechanisms(&pidYaw);
-  serial.printf("%f %d:%d:%d  %d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY);
+  serial.printf("%f %d:%d:%d  %d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY,ManualVaris.R1);
   wheelKinematics.getScale((double)XLocation*0.002,(double)YLocation*0.002,pidYaw,IMU.getYaw(),driverPWMOutput);
   updateMechanism();
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);

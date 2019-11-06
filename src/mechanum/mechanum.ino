@@ -31,6 +31,7 @@ uint8_t AnalogR2;
 uint8_t AnalogL2;
 uint8_t Buttons;
 uint8_t Hanger;
+uint8_t DigitalRL1;
 void SendPacket();
 ButtonEnum buttons[4] = {TRIANGLE,CIRCLE,CROSS,SQUARE};
 void loop() {
@@ -47,14 +48,11 @@ void loop() {
     AnalogR2 = PS4.getAnalogButton(R2);
     AnalogL2 = PS4.getAnalogButton(L2);
     Hanger = PS4.getAnalogHat(RightHatY);
+    DigitalRL1 = PS4.getButtonPress(R1) << 1 | PS4.getButtonPress(L1);
     //Buttons = (int)PS4.getButtonPress(TRIANGLE) << 3 || (int)PS4.getButtonPress(CIRCLE) << 2 || (int)PS4.getButtonPress(CROSS) << 1 || (int)PS4.getButtonPress(SQUARE);
     for(int i = 0;i<4;i++){
       Buttons = Buttons | (int)PS4.getButtonPress(buttons[i]) << 3 - i;
     }
-    if(StickX == 255)StickX = 254;
-    if(StickY == 255)StickY = 254;
-    if(AnalogR2 == 255)AnalogR2 = 254;
-    if(AnalogL2 == 255)AnalogL2 = 254;
     #ifdef DEBUG
       Serial.print("X:");
       Serial.print(StickX);
@@ -67,9 +65,10 @@ void loop() {
       Serial.print("Buttons:");
       Serial.print(Buttons,BIN);
       Serial.print("Hanger:");
-      Serial.println(Hanger);
+      Serial.print(Hanger);
+      Serial.print("R1:");
+      Serial.println(DigitalRL1);
     #endif
-    //SendPacket();
       //接続を切る
     if (PS4.getButtonClick(PS)) {
       Status = 'E';
@@ -89,4 +88,5 @@ void requestEvent()
   Wire.write(AnalogL2);
   Wire.write(Buttons);
   Wire.write(Hanger);
+  Wire.write(DigitalRL1);
 }
