@@ -24,7 +24,7 @@ public:
   KinematicsType getKinematicsType() { return kinematicsType; }
   void getScale(double, double, double, double, SCALE_UNIT*);
   void controlMotor(PwmOut *pwm,SCALE_UNIT*);
-  void controlMotor(PwmOut *pwm,SCALE_UNIT*,int s,int e);
+  void controlMotor(PwmOut *pwm,SCALE_UNIT*,int e);
 private:
   KinematicsType kinematicsType;
   SCALE_UNIT maxAllocateOutput;

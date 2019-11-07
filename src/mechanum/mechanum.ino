@@ -12,9 +12,7 @@ void requestEvent();
 void setup() {
   //通信速度
   Serial.begin(115200);
-  //Serial1.begin(115200);
   Wire.begin(ADDR);
-  //Wire.setClock(400000);
   Wire.onRequest(requestEvent);
   //PS4 BT関係
   while (!Serial);
@@ -33,6 +31,12 @@ uint8_t Buttons;
 uint8_t Hanger;
 uint8_t DigitalRL1;
 void SendPacket();
+uint8_t preDigitalRL1;
+unsigned long timer;
+unsigned long TimerForRumble;
+uint8_t ResetAngle;
+bool Runble = false;
+int16_t Accel;
 ButtonEnum buttons[4] = {TRIANGLE,CIRCLE,CROSS,SQUARE};
 void loop() {
   
@@ -49,10 +53,33 @@ void loop() {
     AnalogL2 = PS4.getAnalogButton(L2);
     Hanger = PS4.getAnalogHat(RightHatY);
     DigitalRL1 = PS4.getButtonPress(R1) << 1 | PS4.getButtonPress(L1);
-    //Buttons = (int)PS4.getButtonPress(TRIANGLE) << 3 || (int)PS4.getButtonPress(CIRCLE) << 2 || (int)PS4.getButtonPress(CROSS) << 1 || (int)PS4.getButtonPress(SQUARE);
+    //Accel = PS4.getSensor(aX);
+    ResetAngle = 0;
+    if(DigitalRL1 == 0b11)//high high 
+    {
+        if(preDigitalRL1 != 0b11)timer = millis();
+        if(timer + 100 < millis())//0.5秒以上
+        {
+          ResetAngle = DigitalRL1;
+          TimerForRumble = millis();
+          PS4.setRumbleOn(RumbleHigh);
+          Runble = true;
+        }
+    }else{
+        timer = millis();
+      }
     for(int i = 0;i<4;i++){
       Buttons = Buttons | (int)PS4.getButtonPress(buttons[i]) << 3 - i;
     }
+    if(Runble)
+    {
+      if(TimerForRumble + 100 < millis())
+      {
+        Runble = false;
+        PS4.setRumbleOff();
+      } 
+    }
+    
     #ifdef DEBUG
       Serial.print("X:");
       Serial.print(StickX);
@@ -67,9 +94,12 @@ void loop() {
       Serial.print("Hanger:");
       Serial.print(Hanger);
       Serial.print("R1:");
-      Serial.println(DigitalRL1);
+      Serial.print(DigitalRL1);
+      Serial.print("AC:");
+      Serial.println(Accel);
     #endif
       //接続を切る
+      preDigitalRL1 = DigitalRL1;
     if (PS4.getButtonClick(PS)) {
       Status = 'E';
       PS4.disconnect();
@@ -88,5 +118,5 @@ void requestEvent()
   Wire.write(AnalogL2);
   Wire.write(Buttons);
   Wire.write(Hanger);
-  Wire.write(DigitalRL1);
+  Wire.write(ResetAngle);
 }

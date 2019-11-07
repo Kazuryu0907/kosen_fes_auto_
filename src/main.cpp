@@ -73,11 +73,11 @@ PwmOut WheelPins[8] = {
 
 PwmOut HGA(PE_11);
 PwmOut HGB(PE_9);
-PwmOut ENA(PE_5);
-PwmOut ENB(PE_6);
+PwmOut ENTA(PE_5);
+PwmOut ENSA(PE_6);
 
 PwmOut MechanismPins[]{//機構用pwmピン指定
-  HGA,HGB,ENA,ENB
+  HGA,HGB,ENTA,ENSA
 };
 double driverPWMOutput[4]; 
 
@@ -108,12 +108,14 @@ struct
   int R1;
   int L1;
   int preR1;
-  double RollPwm;
+  double RollTowelPwm;
+  double RollSheetPwm;
 }ManualVaris;//arduinoからくるDualShockの信号
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
 Timer TimerForRoll;
+Timer TimerForCir;
 
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
 
@@ -147,20 +149,20 @@ PIDController pidObY(0.03, 0.0001, 0);
 PIDController pidObYaw(0.03, 0.005, 0);
 
 Serial serial(USBTX, USBRX);
-Serial SerialControl(PD_5,PD_6);
+//Serial SerialControl(PD_5,PD_6);
 
 CheckFin chObX(20,10);
 CheckFin chObY(20,10);
 
-DigitalIn LimitRight(LimitPin.LimRight);
-DigitalIn LimitLeft(LimitPin.LimLeft);
+//DigitalIn LimitRight(LimitPin.LimRight);
+//DigitalIn LimitLeft(LimitPin.LimLeft);
 
 
 float TargetXYy[][3] = {{0,100.0f,0},{0,-100.0f,0}};//X Y MechanismType
 int currentPoint = 0; 
 
 bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){//バスタオル機構のロリコンがencoderPPRHigh分回ったかどうかの判定
-  if(p->getPulses() < encoderPPRHigh)return(1);
+  if(abs(p->getPulses()) < encoderPPRHigh)return(1);
   else
   {
     p->setDistance(0);
@@ -203,25 +205,43 @@ void ReceivePacket()//arduinoから信号を受け取る
 
 void Mechanisms(double *pidYaw){//コントローラーのボタンが押されてた時の処理
   static double thisyaw;
-  static bool isHigh = false;
+  static bool isHighTri = false;
+  static bool isHighCir = false;
+  static bool preisHighCir = false;
   if(ManualVaris.TRIANGLE)
   {
-    isHigh = true;
+    isHighTri = true;
   }
-  if(isHigh)
+  if(isHighTri)
   {
-    if(updateMechanismEnc(&odometryXAxis,12))ManualVaris.RollPwm = 0.1;//まだ回る
+    if(updateMechanismEnc(&odometryXAxis,12))ManualVaris.RollTowelPwm = 0.5;//まだ回る
     else
     {
-      ManualVaris.RollPwm = 0;//止める
-      isHigh = false;
+      ManualVaris.RollTowelPwm = 0;//止める
+      isHighTri = false;
     }
   } 
 
   if(ManualVaris.CIRCLE)
   {
-    
+    if(!preisHighCir)
+    {
+      isHighCir = true;
+      TimerForCir.reset();
+      TimerForCir.start();
+    }
   }
+  if(isHighCir)
+  {
+    if(TimerForCir.read_ms() < 100){
+      ManualVaris.RollSheetPwm = 0.1;
+    }else{
+      TimerForCir.stop();
+      ManualVaris.RollSheetPwm = 0;
+      isHighCir = false;
+    } 
+  }
+
   if(ManualVaris.CROSS)
   {
     pidObYaw.update(0,IMU.getYaw());//初期角度に回転
@@ -231,29 +251,31 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
   {
 
   }
-  if(*pidYaw != 0)//コントローラーから回転の信号が来てるかどうか
+  if(*pidYaw)//コントローラーから回転の信号が来てるかどうか
   {
     thisyaw = IMU.getYaw();//reset
     TimerForRoll.reset();
   }else
   {               //来てなかったら初期角度を維持
-    if(TimerForRoll.read_ms() > 500){
+    if(TimerForRoll.read_ms() < 500)thisyaw = IMU.getYaw();
     pidObYaw.update(thisyaw,IMU.getYaw());
     *pidYaw = pidObYaw.getTerm();
-    }
   }
   if(ManualVaris.R1 && ManualVaris.L1){//初期角度を設定
     IMU.reset();
     thisyaw = 0;
   }
+
+  preisHighCir = isHighCir;
 }
 
 void updateMechanism(){//機構用pwm出力
-  double mechanismPWMOutput[2];
+  double mechanismPWMOutput[3];
   mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;//max0.3に抑える
-  mechanismPWMOutput[1] = ManualVaris.RollPwm;
-  serial.printf("%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1]);
-  wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0,2);
+  mechanismPWMOutput[1] = ManualVaris.RollTowelPwm;
+  mechanismPWMOutput[2] = ManualVaris.RollSheetPwm;
+  serial.printf("%f:%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1],mechanismPWMOutput[2]);
+  wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0);
 }
 
 void setup(){
@@ -264,7 +286,7 @@ void setup(){
   IMU.setup();
   serial.printf("%s\n","END");
   for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
-  for(int i = 0;i<2;i++)MechanismPins[i].period_ms(1);
+  for(int i = 0;i<4;i++)MechanismPins[i].period_ms(1);
   TimerForMove.start();
   TimerForRoll.start();
 }  
