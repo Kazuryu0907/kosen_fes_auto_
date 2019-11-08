@@ -121,6 +121,7 @@ Timer TimerForQEI;            //エンコーダクラス用共有タイマー
 Timer TimerForMove;
 Timer TimerForRoll;
 Timer TimerForCir;
+Timer TimerForPacket;
 
 MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
 
@@ -181,25 +182,41 @@ bool updateMechanismLim(DigitalIn *p,int HorL){//HorLになったら止める
   if(read != HorL)return(1);
   else return(0);
 }
+
+void ResetPacket(char *p,int l)
+{
+  for(int i = 0;i<l;i++)p[i] = 0;
+}
 void ReceivePacket()//arduinoから信号を受け取る
 {
-  char buf[9];
-  IMU.i2c_->read(0x08<<1,buf,9);
-  if(buf[0] == 'S')ManualVaris.Status = CONN;
-  else if(buf[0] == 'E')ManualVaris.Status = NOCONN;
+  static char checksum[1];
+  static int temptim;
+  static int PacketLen = 9;
+  char buf[PacketLen];
+  checksum[0] = rand() % 256; 
+  IMU.i2c_->write(0x08<<1,checksum,1);
+  IMU.i2c_->read(0x08<<1,buf,PacketLen);
+  temptim = TimerForPacket.read_ms();
+  if(checksum[0] == buf[0])
+  {
+    if(temptim > 30)ResetPacket(buf,PacketLen);
+      ManualVaris.LocationY = abs(buf[1] - 127) < 10?0:-buf[1] + 127;
+      ManualVaris.LocationX = abs(buf[2] - 127) < 10?0:buf[2] - 127;
+      ManualVaris.Yaw = -buf[3] + buf[4];
+      ManualVaris.TRIANGLE = buf[5] & 0b1000;
+      ManualVaris.CIRCLE = buf[5] & 0b0100;
+      ManualVaris.CROSS = buf[5] & 0b0010;
+      ManualVaris.SQUARE = buf[5] & 0b0001;
+      ManualVaris.HangerY = -(abs(buf[6] - 127) < 10?0:buf[6] - 127);
+      ManualVaris.R1 = buf[7] & 0b10;
+      ManualVaris.L1 = buf[7] & 0b01;
+      ManualVaris.Share = buf[8] & 0b10;
+      ManualVaris.Options = buf[8] & 0b01;
+    TimerForPacket.reset();
+  }else ResetPacket(buf,PacketLen);
+  /*
   if(ManualVaris.Status == CONN){
-    ManualVaris.LocationY = abs(buf[1] - 127) < 10?0:-buf[1] + 127;
-    ManualVaris.LocationX = abs(buf[2] - 127) < 10?0:buf[2] - 127;
-    ManualVaris.Yaw = -buf[3] + buf[4];
-    ManualVaris.TRIANGLE = buf[5] & 0b1000;
-    ManualVaris.CIRCLE = buf[5] & 0b0100;
-    ManualVaris.CROSS = buf[5] & 0b0010;
-    ManualVaris.SQUARE = buf[5] & 0b0001;
-    ManualVaris.HangerY = -(abs(buf[6] - 127) < 10?0:buf[6] - 127);
-    ManualVaris.R1 = buf[7] & 0b10;
-    ManualVaris.L1 = buf[7] & 0b01;
-    ManualVaris.Share = buf[8] & 0b10;
-    ManualVaris.Options = buf[8] & 0b01;
+
   }else{
     //接続状態じゃなかったら初期化
     ManualVaris.LocationY = 0;
@@ -215,6 +232,7 @@ void ReceivePacket()//arduinoから信号を受け取る
     ManualVaris.Share = 0;
     ManualVaris.Options = 0;
   }
+  */
 }
 
 void Mechanisms(double *pidYaw){//コントローラーのボタンが押されてた時の処理
@@ -319,6 +337,7 @@ void setup(){
   for(int i = 0;i<5;i++)MechanismPins[i].period_ms(1);
   TimerForMove.start();
   TimerForRoll.start();
+  TimerForPacket.start();
 }  
 
 

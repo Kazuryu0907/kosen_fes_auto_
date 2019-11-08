@@ -7,13 +7,15 @@ PS4BT PS4(&Btd);     //無線
 #define DEBUG
 
 #define ADDR 0x08
-char Status = 'E';
+char Status;
 void requestEvent();
+void receiveEvent();
 void setup() {
   //通信速度
   Serial.begin(115200);
   Wire.begin(ADDR);
   Wire.onRequest(requestEvent);
+  Wire.onReceive(receiveEvent);
   //PS4 BT関係
   while (!Serial);
   if (Usb.Init() == -1) {
@@ -23,6 +25,7 @@ void setup() {
   }
   Serial.print(F("\nPS4 OK Program  Start\n"));
 }
+
 uint8_t StickX;
 uint8_t StickY;
 uint8_t AnalogR2;
@@ -50,7 +53,6 @@ void loop() {
   if (PS4.connected()) 
   { //通信中に実行
     // put your main code here, to run repeatedly:
-    Status = 'S';
     Buttons = 0;
     StickX =  PS4.getAnalogHat(LeftHatY);
     StickY =  PS4.getAnalogHat(LeftHatX);
@@ -80,7 +82,10 @@ void loop() {
         isSO = true;
         TimerForSO = millis();
       }
-    }else isSO = false;
+    }else{
+       PS4.setRumbleOff();
+       isSO = false;
+    }
     if(isSO)
     {
       if(TimerForSO + 1000 > millis()){}//0~1
@@ -133,8 +138,15 @@ void loop() {
       preDigitalRL1 = DigitalRL1;
       preShareOptions = ShareOptions;
     if (PS4.getButtonClick(PS)) {
-      Status = 'E';
       PS4.disconnect();
+      StickX = 0;
+      StickY = 0;
+      AnalogR2 = 0;
+      AnalogL2 = 0;
+      Buttons = 0;
+      Hanger = 0;
+      ResetAngle = 0;
+      Unfold = 0;
     }
     
   }
@@ -152,4 +164,9 @@ void requestEvent()
   Wire.write(Hanger);
   Wire.write(ResetAngle);
   Wire.write(Unfold);
+}
+
+void receiveEvent()
+{
+  if(Wire.available())Status = Wire.read();
 }
