@@ -71,13 +71,15 @@ PwmOut WheelPins[8] = {
   RFA,RFB,LFA,LFB,RBA,RBB,LBA,LBB
 };
 
-PwmOut HGA(PE_11);
-PwmOut HGB(PE_9);
-PwmOut ENTA(PE_5);
-PwmOut ENSA(PE_6);
+DigitalIn DinUnfoldLim(PF_6);
+PwmOut HGA(PE_11);//1/2
+PwmOut HGB(PE_9);//1/1
+PwmOut ENTA(PE_5);//9/1
+PwmOut ENSA(PE_6);//9/2
+PwmOut LMA(PA_3);//2/4
 
 PwmOut MechanismPins[]{//機構用pwmピン指定
-  HGA,HGB,ENTA,ENSA
+  HGA,HGB,ENTA,ENSA,LMA
 };
 double driverPWMOutput[4]; 
 
@@ -110,6 +112,9 @@ struct
   int preR1;
   double RollTowelPwm;
   double RollSheetPwm;
+  bool Share;
+  bool Options;
+  double UnfoldPwm;
 }ManualVaris;//arduinoからくるDualShockの信号
 
 Timer TimerForQEI;            //エンコーダクラス用共有タイマー
@@ -171,10 +176,15 @@ bool updateMechanismEnc(MWodometry *p,int encoderPPRHigh){//バスタオル機�
   serial.printf("%d\n",p->getPulses());
 }
 
+bool updateMechanismLim(DigitalIn *p,int HorL){//HorLになったら止める
+  int read = p->read();
+  if(read != HorL)return(1);
+  else return(0);
+}
 void ReceivePacket()//arduinoから信号を受け取る
 {
-  char buf[8];
-  IMU.i2c_->read(0x08<<1,buf,8);
+  char buf[9];
+  IMU.i2c_->read(0x08<<1,buf,9);
   if(buf[0] == 'S')ManualVaris.Status = CONN;
   else if(buf[0] == 'E')ManualVaris.Status = NOCONN;
   if(ManualVaris.Status == CONN){
@@ -188,6 +198,8 @@ void ReceivePacket()//arduinoから信号を受け取る
     ManualVaris.HangerY = -(abs(buf[6] - 127) < 10?0:buf[6] - 127);
     ManualVaris.R1 = buf[7] & 0b10;
     ManualVaris.L1 = buf[7] & 0b01;
+    ManualVaris.Share = buf[8] & 0b10;
+    ManualVaris.Options = buf[8] & 0b01;
   }else{
     //接続状態じゃなかったら初期化
     ManualVaris.LocationY = 0;
@@ -200,6 +212,8 @@ void ReceivePacket()//arduinoから信号を受け取る
     ManualVaris.HangerY = 0;
     ManualVaris.R1 = 0;
     ManualVaris.L1 = 0;
+    ManualVaris.Share = 0;
+    ManualVaris.Options = 0;
   }
 }
 
@@ -208,6 +222,7 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
   static bool isHighTri = false;
   static bool isHighCir = false;
   static bool preisHighCir = false;
+  static bool isHighShareOptions = false;
   if(ManualVaris.TRIANGLE)
   {
     isHighTri = true;
@@ -233,7 +248,7 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
   }
   if(isHighCir)
   {
-    if(TimerForCir.read_ms() < 100){
+    if(TimerForCir.read_ms() < 800){
       ManualVaris.RollSheetPwm = 0.1;
     }else{
       TimerForCir.stop();
@@ -266,15 +281,30 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
     thisyaw = 0;
   }
 
+  if(ManualVaris.Share && ManualVaris.Options)
+  {
+    isHighShareOptions = true;
+  }
+  serial.printf("%d\n",isHighShareOptions);
+  if(isHighShareOptions)
+  {
+    if(updateMechanismLim(&DinUnfoldLim,1))ManualVaris.UnfoldPwm = 0.3;//1になるまで回り続ける
+    else
+    {
+      ManualVaris.UnfoldPwm = 0;
+      isHighShareOptions = false;
+    }
+  }
   preisHighCir = isHighCir;
 }
 
 void updateMechanism(){//機構用pwm出力
-  double mechanismPWMOutput[3];
+  double mechanismPWMOutput[4];
   mechanismPWMOutput[0] = (double)ManualVaris.HangerY*0.00787*0.3;//max0.3に抑える
   mechanismPWMOutput[1] = ManualVaris.RollTowelPwm;
   mechanismPWMOutput[2] = ManualVaris.RollSheetPwm;
-  serial.printf("%f:%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1],mechanismPWMOutput[2]);
+  mechanismPWMOutput[3] = ManualVaris.UnfoldPwm;
+  serial.printf("%f:%f:%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1],mechanismPWMOutput[2],mechanismPWMOutput[3]);
   wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0);
 }
 
@@ -286,7 +316,7 @@ void setup(){
   IMU.setup();
   serial.printf("%s\n","END");
   for(int i = 0;i<8;i++)WheelPins[i].period_ms(1);
-  for(int i = 0;i<4;i++)MechanismPins[i].period_ms(1);
+  for(int i = 0;i<5;i++)MechanismPins[i].period_ms(1);
   TimerForMove.start();
   TimerForRoll.start();
 }  
@@ -297,7 +327,8 @@ void update(int XLocation,int YLocation,int Yaw){
   double pidYaw;
   pidYaw = (double)Yaw*0.001;
   Mechanisms(&pidYaw);
-  serial.printf("%f %d:%d:%d  %d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY,ManualVaris.R1);
+  //serial.printf("%f %d:%d:%d  %d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY,ManualVaris.R1);
+  serial.printf("%d:%d\n",ManualVaris.Share,ManualVaris.Options);
   wheelKinematics.getScale((double)XLocation*0.002,(double)YLocation*0.002,pidYaw,IMU.getYaw(),driverPWMOutput);
   updateMechanism();
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);

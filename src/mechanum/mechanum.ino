@@ -32,10 +32,15 @@ uint8_t Hanger;
 uint8_t DigitalRL1;
 void SendPacket();
 uint8_t preDigitalRL1;
-unsigned long timer;
+unsigned long TimerForRL1;
 unsigned long TimerForRumble;
+unsigned long TimerForSO;
 uint8_t ResetAngle;
+uint8_t ShareOptions;
 bool Runble = false;
+bool isSO = false;
+uint8_t Unfold;
+uint8_t preShareOptions = 0;
 int16_t Accel;
 ButtonEnum buttons[4] = {TRIANGLE,CIRCLE,CROSS,SQUARE};
 void loop() {
@@ -53,12 +58,13 @@ void loop() {
     AnalogL2 = PS4.getAnalogButton(L2);
     Hanger = PS4.getAnalogHat(RightHatY);
     DigitalRL1 = PS4.getButtonPress(R1) << 1 | PS4.getButtonPress(L1);
-    //Accel = PS4.getSensor(aX);
+    ShareOptions = PS4.getButtonPress(SHARE) << 1 | PS4.getButtonPress(OPTIONS);
     ResetAngle = 0;
+    Unfold = 0;
     if(DigitalRL1 == 0b11)//high high 
     {
-        if(preDigitalRL1 != 0b11)timer = millis();
-        if(timer + 100 < millis())//0.5秒以上
+        if(preDigitalRL1 != 0b11)TimerForRL1 = millis();
+        if(TimerForRL1 + 100 < millis())//0.5秒以上
         {
           ResetAngle = DigitalRL1;
           TimerForRumble = millis();
@@ -66,8 +72,33 @@ void loop() {
           Runble = true;
         }
     }else{
-        timer = millis();
+        TimerForRL1 = millis();
       }
+    if(ShareOptions == 0b11)
+    {
+      if(preShareOptions != 0b11){
+        isSO = true;
+        TimerForSO = millis();
+      }
+    }else isSO = false;
+    if(isSO)
+    {
+      if(TimerForSO + 1000 > millis()){}//0~1
+      else if(TimerForSO + 2000 > millis())
+      {
+        PS4.setRumbleOn(RumbleLow);
+      }
+      else if(TimerForSO + 3000 > millis())
+      {
+        PS4.setRumbleOn(RumbleHigh); 
+      }
+      else if(TimerForSO + 3000 <= millis())
+      {
+        PS4.setRumbleOff();
+        Unfold = ShareOptions;
+      }
+    }else TimerForSO = millis();
+    
     for(int i = 0;i<4;i++){
       Buttons = Buttons | (int)PS4.getButtonPress(buttons[i]) << 3 - i;
     }
@@ -95,11 +126,12 @@ void loop() {
       Serial.print(Hanger);
       Serial.print("R1:");
       Serial.print(DigitalRL1);
-      Serial.print("AC:");
-      Serial.println(Accel);
+      Serial.print("SO:");
+      Serial.println(Unfold);
     #endif
       //接続を切る
       preDigitalRL1 = DigitalRL1;
+      preShareOptions = ShareOptions;
     if (PS4.getButtonClick(PS)) {
       Status = 'E';
       PS4.disconnect();
@@ -119,4 +151,5 @@ void requestEvent()
   Wire.write(Buttons);
   Wire.write(Hanger);
   Wire.write(ResetAngle);
+  Wire.write(Unfold);
 }
