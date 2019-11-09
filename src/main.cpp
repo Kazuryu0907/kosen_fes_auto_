@@ -282,7 +282,8 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
   }
   if(ManualVaris.SQUARE)
   {
-
+    if(abs(ManualVaris.LocationX) > abs(ManualVaris.LocationY))ManualVaris.LocationY = 0;
+    else ManualVaris.LocationX = 0;
   }
   if(*pidYaw)//コントローラーから回転の信号が来てるかどうか
   {
@@ -313,7 +314,7 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
       isHighShareOptions = false;
     }
   }
-  preisHighCir = isHighCir;
+  preisHighCir = isHighCir;//
 }
 
 void updateMechanism(){//機構用pwm出力
