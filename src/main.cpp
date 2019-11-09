@@ -280,7 +280,7 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
     pidObYaw.update(0,IMU.getYaw());//初期角度に回転
     *pidYaw = pidObYaw.getTerm();
   }
-  if(ManualVaris.SQUARE)
+  if(!ManualVaris.SQUARE)
   {
     if(abs(ManualVaris.LocationX) > abs(ManualVaris.LocationY))ManualVaris.LocationY = 0;
     else ManualVaris.LocationX = 0;
