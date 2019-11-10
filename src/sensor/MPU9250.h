@@ -9,10 +9,16 @@
 #define regYaw 0x47 // register of gyro_Z_H
 #define regWAI 0x75 // register of "Who am I"
 
+typedef enum type{
+    i2c,
+    spi
+}UARTType;
+
 class MPU9250
 {
 public:
-  MPU9250(PinName, PinName, int);
+
+  MPU9250(PinName, PinName, int,UARTType);
   void setup(); //オフセット値の計算
   void update();
   double getYaw() { 
@@ -33,10 +39,10 @@ public:
     offsetGyroZ = targetOffset;
   }
   I2C *i2c_;
+  SPI *spi_;
 private:
-  
+  UARTType uarttype;
   Timer *timer_;
-
   void writeByte(uint8_t address, uint8_t subAddress, uint8_t data)
   {
     char data_write[2];

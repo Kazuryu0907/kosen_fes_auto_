@@ -123,7 +123,7 @@ Timer TimerForRoll;
 Timer TimerForCir;
 Timer TimerForPacket;
 
-MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C);
+MPU9250 IMU(I2CPin.IMUSDA, I2CPin.IMUSCL, SerialBaud.I2C,i2c);
 
 I2C i2cControl(I2CPin.IMUSDA,I2CPin.IMUSCL);
 

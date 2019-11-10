@@ -1,13 +1,21 @@
 #include "MPU9250.h"
 #include "mbed.h"
 
-MPU9250::MPU9250(PinName sda, PinName scl, int baud)
+MPU9250::MPU9250(PinName sda, PinName scl, int baud,UARTType type)
 {
-  init();
-  i2c_ = new I2C(sda, scl);
-  i2c_->frequency(baud);
-  timer_ = new Timer();
-  timer_->start();
+  uarttype = type;
+  switch(type){
+    case i2c:
+      init();
+      i2c_ = new I2C(sda, scl);
+      i2c_->frequency(baud);
+      timer_ = new Timer();
+      timer_->start();
+    break;
+    case spi:
+
+    break;
+  }
 }
 
 void MPU9250::init()
