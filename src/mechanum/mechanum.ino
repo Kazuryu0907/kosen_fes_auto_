@@ -4,7 +4,7 @@
 USB Usb;
 BTD Btd(&Usb);       //無線
 PS4BT PS4(&Btd);     //無線
-#define DEBUG
+//#define DEBUG
 
 #define ADDR 0x08
 char Status;
@@ -14,6 +14,7 @@ void setup() {
   //通信速度
   Serial.begin(115200);
   Wire.begin(ADDR);
+  Wire.setClock(400000);
   Wire.onRequest(requestEvent);
   Wire.onReceive(receiveEvent);
   //PS4 BT関係
@@ -53,6 +54,7 @@ void loop() {
   if (PS4.connected()) 
   { //通信中に実行
     // put your main code here, to run repeatedly:
+    Status = 1;
     Buttons = 0;
     StickX =  PS4.getAnalogHat(LeftHatY);
     StickY =  PS4.getAnalogHat(LeftHatX);
@@ -147,6 +149,7 @@ void loop() {
       Hanger = 0;
       ResetAngle = 0;
       Unfold = 0;
+      Status = 0;
     }
     
   }

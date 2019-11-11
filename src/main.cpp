@@ -8,7 +8,7 @@
 
 #define SIZEOF(a) (sizeof(a)/sizeof(&a)-1)
 
-#define MANUAL
+//#define MANUAL
 
 #define DEBUG
 
@@ -185,21 +185,32 @@ bool updateMechanismLim(DigitalIn *p,int HorL){//HorLになったら止める
 
 void ResetPacket(char *p,int l)
 {
-  for(int i = 0;i<l;i++)p[i] = 0;
+  p[0] = 127;
+  p[1] = 127;
+  for(int i = 2;i<6;i++)p[i] = 0;
+  p[6] = 127;
+  p[7] = 0;
+  p[8] = 0;
 }
 void ReceivePacket()//arduinoから信号を受け取る
 {
-  static char checksum[1];
-  static int temptim;
+  //static char checksum[1];
+  //static int temptim;
   static int PacketLen = 9;
   char buf[PacketLen];
-  checksum[0] = rand() % 256; 
-  IMU.i2c_->write(0x08<<1,checksum,1);
+  //checksum[0] = rand() % 256; 
+  //IMU.i2c_->write(0x08<<1,checksum,1);
   IMU.i2c_->read(0x08<<1,buf,PacketLen);
-  temptim = TimerForPacket.read_ms();
-  if(checksum[0] == buf[0])
+ // temptim = TimerForPacket.read_ms();
+  //serial.printf("%d\n",temptim);
+  //if(checksum[0] == buf[0])
+  //{
+      //if(temptim > 30)ResetPacket(buf,PacketLen);
+ // }else ResetPacket(buf,PacketLen);
+  //TimerForPacket.reset();
+  
+  if(buf[0] == 1)
   {
-    if(temptim > 30)ResetPacket(buf,PacketLen);
       ManualVaris.LocationY = abs(buf[1] - 127) < 10?0:-buf[1] + 127;
       ManualVaris.LocationX = abs(buf[2] - 127) < 10?0:buf[2] - 127;
       ManualVaris.Yaw = -buf[3] + buf[4];
@@ -212,11 +223,6 @@ void ReceivePacket()//arduinoから信号を受け取る
       ManualVaris.L1 = buf[7] & 0b01;
       ManualVaris.Share = buf[8] & 0b10;
       ManualVaris.Options = buf[8] & 0b01;
-    TimerForPacket.reset();
-  }else ResetPacket(buf,PacketLen);
-  /*
-  if(ManualVaris.Status == CONN){
-
   }else{
     //接続状態じゃなかったら初期化
     ManualVaris.LocationY = 0;
@@ -232,7 +238,7 @@ void ReceivePacket()//arduinoから信号を受け取る
     ManualVaris.Share = 0;
     ManualVaris.Options = 0;
   }
-  */
+  
 }
 
 void Mechanisms(double *pidYaw){//コントローラーのボタンが押されてた時の処理
@@ -281,6 +287,7 @@ void Mechanisms(double *pidYaw){//コントローラーのボタンが押され�
     *pidYaw = pidObYaw.getTerm();
   }
   if(!ManualVaris.SQUARE)
+
   {
     if(abs(ManualVaris.LocationX) > abs(ManualVaris.LocationY))ManualVaris.LocationY = 0;
     else ManualVaris.LocationX = 0;
@@ -323,7 +330,7 @@ void updateMechanism(){//機構用pwm出力
   mechanismPWMOutput[1] = ManualVaris.RollTowelPwm;
   mechanismPWMOutput[2] = ManualVaris.RollSheetPwm;
   mechanismPWMOutput[3] = ManualVaris.UnfoldPwm;
-  serial.printf("%f:%f:%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1],mechanismPWMOutput[2],mechanismPWMOutput[3]);
+  //serial.printf("%f:%f:%f:%f\n",mechanismPWMOutput[0],mechanismPWMOutput[1],mechanismPWMOutput[2],mechanismPWMOutput[3]);
   wheelKinematics.controlMotor(MechanismPins,mechanismPWMOutput,0);
 }
 
@@ -348,7 +355,7 @@ void update(int XLocation,int YLocation,int Yaw){
   pidYaw = (double)Yaw*0.001;
   Mechanisms(&pidYaw);
   //serial.printf("%f %d:%d:%d  %d:%d\n",IMU.getYaw(),XLocation,YLocation,Yaw,ManualVaris.HangerY,ManualVaris.R1);
-  serial.printf("%d:%d\n",ManualVaris.Share,ManualVaris.Options);
+  //serial.printf("%d:%d\n",ManualVaris.Share,ManualVaris.Options);
   wheelKinematics.getScale((double)XLocation*0.002,(double)YLocation*0.002,pidYaw,IMU.getYaw(),driverPWMOutput);
   updateMechanism();
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
@@ -367,7 +374,12 @@ void update(double *currentXLocation,double *currentYLocation){
   *currentYLocation += xTemp * sin(ToRadian(IMU.getYaw()));
   *currentXLocation -= yTemp * sin(ToRadian(IMU.getYaw()));
   *currentYLocation += yTemp * cos(ToRadian(IMU.getYaw()));
-  
+  if(abs(*currentXLocation) >= abs(TargetXYy[currentPoint][0]) && abs(*currentYLocation) >= abs(TargetXYy[currentPoint][1])){//更新処理
+    currentPoint++;
+    TargetXYy[currentPoint][0] += TargetXYy[currentPoint-1][0] - *currentXLocation;
+    TargetXYy[currentPoint][1] += TargetXYy[currentPoint-1][1] - *currentYLocation;
+    }
+
   
 
   pidObX.update(TargetXYy[currentPoint][0],*currentXLocation);
@@ -377,7 +389,7 @@ void update(double *currentXLocation,double *currentYLocation){
   double pidX = pidObX.getTerm();
   double pidY = pidObY.getTerm();
   double pidYaw = pidObYaw.getTerm();
-
+/*
   if(abs(*currentXLocation) > abs(TargetXYy[currentPoint][0])*0.1)chObX.update(*currentXLocation);
   if(abs(*currentYLocation) > abs(TargetXYy[currentPoint][1])*0.1)chObY.update(*currentYLocation);
 
@@ -390,7 +402,7 @@ void update(double *currentXLocation,double *currentYLocation){
     *currentXLocation = 0;
     *currentYLocation = 0;
   }
-
+*/
   serial.printf("%f%s%f%s%f%s%f%s%f\n",IMU.getYaw(),":",pidX,":",pidY,"  ",*currentXLocation,":",*currentYLocation);
   wheelKinematics.getScale(pidX,pidY,pidYaw,IMU.getYaw(),driverPWMOutput);
   wheelKinematics.controlMotor(WheelPins,driverPWMOutput);
@@ -418,7 +430,7 @@ int main(){
       #ifdef MANUAL
         ReceivePacket();
         update(ManualVaris.LocationX,ManualVaris.LocationY,ManualVaris.Yaw);
-        //serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
+        serial.printf("%d%s%d%s%d%s%d%s%d%s%d%s%d\n",ManualVaris.LocationX,":",ManualVaris.LocationY,":",ManualVaris.Yaw,":",ManualVaris.TRIANGLE,":",ManualVaris.CIRCLE,":",ManualVaris.CROSS,":",ManualVaris.SQUARE);
       #else
         update(&currentXLocation,&currentYLocation);
       #endif
